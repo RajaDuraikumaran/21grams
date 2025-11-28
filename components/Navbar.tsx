@@ -19,7 +19,21 @@ export function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isContactOpen, setIsContactOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Fetch user on mount
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email || null);
+                setUserAvatar(user.user_metadata?.avatar_url || null);
+            }
+        };
+        getUser();
+    }, []);
 
     // Click outside handler
     useEffect(() => {
@@ -118,9 +132,13 @@ export function Navbar() {
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-600 text-xs font-medium text-white ring-2 ring-zinc-950 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-600 text-xs font-medium text-white ring-2 ring-zinc-950 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-zinc-950 overflow-hidden"
                             >
-                                R
+                                {userAvatar ? (
+                                    <img src={userAvatar} alt="Avatar" className="h-full w-full object-cover" />
+                                ) : (
+                                    <span className="text-sm font-bold">{userEmail ? userEmail[0].toUpperCase() : "?"}</span>
+                                )}
                             </button>
 
                             <AnimatePresence>
@@ -134,7 +152,7 @@ export function Navbar() {
                                     >
                                         <div className="p-4">
                                             <p className="text-xs font-semibold text-zinc-100">Account</p>
-                                            <p className="text-xs text-zinc-500 truncate">rduraikumaran@gmail.com</p>
+                                            <p className="text-xs text-zinc-500 truncate">{userEmail || "Guest"}</p>
                                         </div>
                                         <div className="border-t border-zinc-800" />
                                         <div className="p-2">

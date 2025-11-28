@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 interface ContactModalProps {
     isOpen: boolean;
@@ -15,18 +16,57 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
     const [isSending, setIsSending] = useState(false);
     const [subject, setSubject] = useState("Billing Issue");
     const [message, setMessage] = useState("");
+    const [userEmail, setUserEmail] = useState("");
+
+    // Fetch user email on mount
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+                setUserEmail(user.email);
+            }
+        };
+        getUser();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!userEmail) {
+            toast.error("Please log in to send a message");
+            return;
+        }
+
         setIsSending(true);
 
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+            const response = await fetch('/api/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    subject,
+                    message,
+                    userEmail,
+                }),
+            });
 
-        setIsSending(false);
-        onClose();
-        toast.success("Message sent! Ticket #2910 created.");
-        setMessage("");
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send message');
+            }
+
+            toast.success("Message sent! We'll get back to you soon.");
+            setMessage("");
+            onClose();
+        } catch (error: any) {
+            console.error('Send error:', error);
+            toast.error(error.message || "Failed to send message. Please try again.");
+        } finally {
+            setIsSending(false);
+        }
     };
 
     return (

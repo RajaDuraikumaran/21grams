@@ -32,10 +32,18 @@ export async function GET(request: Request) {
                 },
             }
         )
+
+        console.log("Auth Callback: Exchanging code for session...");
         const { error } = await supabase.auth.exchangeCodeForSession(code)
+
         if (!error) {
+            console.log("Auth Callback: Session established. Redirecting to dashboard.");
             return NextResponse.redirect(`${origin}${next}`)
+        } else {
+            console.error("Auth Callback Error:", error.message);
         }
+    } else {
+        console.warn("Auth Callback: No code found in URL.");
     }
 
     // return the user to an error page with instructions
