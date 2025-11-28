@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'modelslab-bom.s3.amazonaws.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'hsdnkpafwlmgieovqrkq.supabase.co',
+      },
     ],
   },
 };
