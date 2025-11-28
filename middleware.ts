@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -13,45 +13,76 @@ export async function middleware(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
             cookies: {
-                getAll() {
-                    return request.cookies.getAll()
+                get(name: string) {
+                    return request.cookies.get(name)?.value
                 },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        request.cookies.set(name, value)
-                    )
+                set(name: string, value: string, options: CookieOptions) {
+                    // Set cookie on request for immediate availability
+                    request.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                    // Set cookie on response to persist
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
                         },
                     })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
-                    )
+                    response.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                },
+                remove(name: string, options: CookieOptions) {
+                    // Remove from request
+                    request.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
+                    // Remove from response
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    })
+                    response.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
                 },
             },
         }
     )
 
+    // IMPORTANT: This refreshes the session and sets cookies
     const {
         data: { user },
     } = await supabase.auth.getUser()
 
     // Protected Routes
-    // We treat '/' as the "Create" page which is protected
     const protectedRoutes = ['/dashboard', '/pricing', '/create']
-    const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route)) || request.nextUrl.pathname === '/'
+    const isProtectedRoute = protectedRoutes.some(route =>
+        request.nextUrl.pathname.startsWith(route)
+    ) || request.nextUrl.pathname === '/'
 
     // Auth Routes
     const authRoutes = ['/login']
-    const isAuthRoute = authRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+    const isAuthRoute = authRoutes.some(route =>
+        request.nextUrl.pathname.startsWith(route)
+    )
 
+    // Redirect unauthenticated users from protected routes
     if (!user && isProtectedRoute) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
     }
 
+    // Redirect authenticated users from auth routes
     if (user && isAuthRoute) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/dashboard'
@@ -68,8 +99,8 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
+         * - api routes (they handle their own auth)
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
