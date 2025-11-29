@@ -17,13 +17,11 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.get(name)?.value
                 },
                 set(name: string, value: string, options: CookieOptions) {
-                    // Set cookie on request for immediate availability
                     request.cookies.set({
                         name,
                         value,
                         ...options,
                     })
-                    // Set cookie on response to persist
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
@@ -36,13 +34,11 @@ export async function middleware(request: NextRequest) {
                     })
                 },
                 remove(name: string, options: CookieOptions) {
-                    // Remove from request
                     request.cookies.set({
                         name,
                         value: '',
                         ...options,
                     })
-                    // Remove from response
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
@@ -58,36 +54,33 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // IMPORTANT: This refreshes the session and sets cookies
+    // 1. Refresh session
     const {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protected Routes
+    // 2. Allow Auth Callback Routes explicitly
+    // This prevents the middleware from redirecting the callback to /login
+    if (request.nextUrl.pathname.startsWith('/auth')) {
+        return response
+    }
+
+    // 3. Handle Login Page
+    if (request.nextUrl.pathname === '/login') {
+        if (user) {
+            return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
+        return response
+    }
+
+    // 4. Handle Protected Routes
     const protectedRoutes = ['/dashboard', '/pricing', '/create']
     const isProtectedRoute = protectedRoutes.some(route =>
         request.nextUrl.pathname.startsWith(route)
     ) || request.nextUrl.pathname === '/'
 
-    // Auth Routes
-    const authRoutes = ['/login']
-    const isAuthRoute = authRoutes.some(route =>
-        request.nextUrl.pathname.startsWith(route)
-    )
-
-    // Redirect unauthenticated users from protected routes
-    if (!user && isProtectedRoute) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        redirectUrl.searchParams.set('error', 'middleware_redirect')
-        return NextResponse.redirect(redirectUrl)
-    }
-
-    // Redirect authenticated users from auth routes
-    if (user && isAuthRoute) {
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/dashboard'
-        return NextResponse.redirect(redirectUrl)
+    if (isProtectedRoute && !user) {
+        return NextResponse.redirect(new URL('/login', request.url))
     }
 
     return response
