@@ -188,7 +188,7 @@ export default function LoginPage() {
                                     />
                                 </svg>
                             )}
-                            Continue with Google
+                            Login with Google
                         </button>
 
                         <div className="relative">
