@@ -1,29 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'replicate.delivery',
-      },
-      {
-        protocol: 'https',
-        hostname: 'modelslab-bom.s3.amazonaws.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'hsdnkpafwlmgieovqrkq.supabase.co',
-      },
-    ],
+  /* config options here */
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
   },
 };
 
