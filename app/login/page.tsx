@@ -34,6 +34,11 @@ export default function LoginPage() {
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         const redirectTo = `${window.location.origin}/auth/callback`;
+
+        console.log("Starting Google Login...");
+        console.log("Redirect URL:", redirectTo);
+        console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
