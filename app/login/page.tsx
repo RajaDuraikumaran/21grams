@@ -31,6 +31,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
+    // Google OAuth login handler
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         // Fix for production: use protocol + hostname + port instead of origin
