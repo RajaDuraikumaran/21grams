@@ -3,10 +3,15 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
+    console.log("Auth Callback started");
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     // if "next" is in param, use it as the redirect URL
     const next = searchParams.get('next') ?? '/dashboard'
+
+    console.log("Code received: ", code ? "Yes" : "No");
+    console.log("Supabase URL present:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("Supabase Anon Key present:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
     if (code) {
         const cookieStore = await cookies()
@@ -33,21 +38,24 @@ export async function GET(request: Request) {
             }
         )
 
-        console.log("Auth Callback: Exchanging code for session...");
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        try {
+            console.log("Auth Callback: Exchanging code for session...");
+            const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-        if (!error) {
-            console.log("Auth Callback: Session established. Redirecting to dashboard.");
+            if (error) {
+                console.error("Exchange Error:", error);
+                return NextResponse.redirect(`${origin}/login?error=exchange_failed&details=${encodeURIComponent(error.message)}`)
+            }
+
+            console.log("Session created");
             return NextResponse.redirect(`${origin}${next}`)
-        } else {
-            console.error("Auth Callback Error:", error.message);
-            return NextResponse.redirect(`${origin}/login?error=auth-code-error&details=${encodeURIComponent(error.message)}`)
+
+        } catch (err: any) {
+            console.error("Unexpected Exchange Error:", err);
+            return NextResponse.redirect(`${origin}/login?error=exchange_failed&details=${encodeURIComponent(err.message || "Unknown error")}`)
         }
     } else {
         console.warn("Auth Callback: No code found in URL.");
         return NextResponse.redirect(`${origin}/login?error=no_code_provided`)
     }
-
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/login?error=unknown_error`)
 }
