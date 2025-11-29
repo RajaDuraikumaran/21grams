@@ -41,11 +41,13 @@ export async function GET(request: Request) {
             return NextResponse.redirect(`${origin}${next}`)
         } else {
             console.error("Auth Callback Error:", error.message);
+            return NextResponse.redirect(`${origin}/login?error=auth-code-error&details=${encodeURIComponent(error.message)}`)
         }
     } else {
         console.warn("Auth Callback: No code found in URL.");
+        return NextResponse.redirect(`${origin}/login?error=no_code_provided`)
     }
 
     // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
+    return NextResponse.redirect(`${origin}/login?error=unknown_error`)
 }

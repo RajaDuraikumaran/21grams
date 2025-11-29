@@ -79,6 +79,7 @@ export async function middleware(request: NextRequest) {
     if (!user && isProtectedRoute) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
+        redirectUrl.searchParams.set('error', 'middleware_redirect')
         return NextResponse.redirect(redirectUrl)
     }
 
