@@ -33,7 +33,11 @@ export default function LoginPage() {
 
     const handleGoogleLogin = async () => {
         setIsLoading(true);
-        const redirectTo = `${window.location.origin}/auth/callback`;
+        // Fix for production: use protocol + hostname + port instead of origin
+        const origin = typeof window !== 'undefined'
+            ? `${window.location.protocol}//${window.location.host}`
+            : '';
+        const redirectTo = `${origin}/auth/callback`;
 
         console.log("Starting Google Login...");
         console.log("Redirect URL:", redirectTo);
