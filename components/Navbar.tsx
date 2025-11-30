@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Zap, User, CreditCard, Mail, LogOut, Menu, X } from "lucide-react";
+import { Zap, User, Mail, LogOut, Menu, X, Github } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -83,13 +83,23 @@ export function Navbar() {
                         </button>
 
                         {/* Logo */}
-                        <div className="flex items-center gap-2">
+                        <Link href="/create" className="flex items-center gap-2">
                             <span className="text-xl font-black tracking-tighter text-white">21Grams.</span>
-                        </div>
+                        </Link>
                     </div>
 
                     {/* Center Links (Desktop) */}
                     <div className="hidden items-center gap-8 md:flex">
+                        <Link
+                            href="/create"
+                            onClick={handleCreateClick}
+                            className={cn(
+                                "text-sm font-medium transition-colors hover:text-white",
+                                pathname === "/" || pathname === "/create" ? "text-white" : "text-zinc-400"
+                            )}
+                        >
+                            Create
+                        </Link>
                         <Link
                             href="/dashboard"
                             className={cn(
@@ -99,34 +109,27 @@ export function Navbar() {
                         >
                             Dashboard
                         </Link>
-                        <Link
-                            href="/"
-                            onClick={handleCreateClick}
-                            className={cn(
-                                "text-sm font-medium transition-colors hover:text-white",
-                                pathname === "/" ? "text-white" : "text-zinc-400"
-                            )}
+                        <a
+                            href="https://github.com/RajaDuraikumaran/21grams"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-zinc-400 transition-colors hover:text-white flex items-center gap-1.5"
                         >
-                            Create
-                        </Link>
-                        <Link
-                            href="/pricing"
-                            className={cn(
-                                "text-sm font-medium transition-colors hover:text-white",
-                                pathname === "/pricing" ? "text-white" : "text-zinc-400"
-                            )}
-                        >
-                            Pricing
-                        </Link>
+                            <Github className="h-4 w-4" />
+                            GitHub
+                        </a>
                     </div>
 
                     {/* Right Side */}
                     <div className="flex items-center gap-4">
                         {/* Credits Badge (Desktop) */}
-                        <div className="hidden md:flex items-center gap-1.5 rounded-full bg-zinc-800 px-3 py-1.5 border border-white/10">
+                        <button
+                            onClick={() => toast.info("Credits reset every 24 hours.")}
+                            className="hidden md:flex items-center gap-1.5 rounded-full bg-zinc-800 px-3 py-1.5 border border-white/10 hover:bg-zinc-700 transition-colors cursor-pointer"
+                        >
                             <Zap className="h-3.5 w-3.5 text-white fill-white" />
                             <span className="text-xs font-medium text-white">{credits} credits</span>
-                        </div>
+                        </button>
 
                         {/* User Profile Dropdown */}
                         <div className="relative" ref={dropdownRef}>
@@ -156,14 +159,6 @@ export function Navbar() {
                                         </div>
                                         <div className="border-t border-zinc-800" />
                                         <div className="p-2">
-                                            <Link
-                                                href="/pricing"
-                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
-                                                onClick={() => setIsDropdownOpen(false)}
-                                            >
-                                                <CreditCard className="h-4 w-4" />
-                                                Billing
-                                            </Link>
                                             <button
                                                 onClick={() => {
                                                     setIsContactOpen(true);
@@ -223,6 +218,16 @@ export function Navbar() {
 
                             <div className="flex flex-col gap-6">
                                 <Link
+                                    href="/create"
+                                    onClick={handleCreateClick}
+                                    className={cn(
+                                        "text-lg font-medium transition-colors hover:text-white",
+                                        pathname === "/" || pathname === "/create" ? "text-white" : "text-zinc-400"
+                                    )}
+                                >
+                                    Create
+                                </Link>
+                                <Link
                                     href="/dashboard"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className={cn(
@@ -232,26 +237,16 @@ export function Navbar() {
                                 >
                                     Dashboard
                                 </Link>
-                                <Link
-                                    href="/"
-                                    onClick={handleCreateClick}
-                                    className={cn(
-                                        "text-lg font-medium transition-colors hover:text-white",
-                                        pathname === "/" ? "text-white" : "text-zinc-400"
-                                    )}
-                                >
-                                    Create
-                                </Link>
-                                <Link
-                                    href="/pricing"
+                                <a
+                                    href="https://github.com/RajaDuraikumaran/21grams"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className={cn(
-                                        "text-lg font-medium transition-colors hover:text-white",
-                                        pathname === "/pricing" ? "text-white" : "text-zinc-400"
-                                    )}
+                                    className="text-lg font-medium text-zinc-400 transition-colors hover:text-white flex items-center gap-2"
                                 >
-                                    Pricing
-                                </Link>
+                                    <Github className="h-5 w-5" />
+                                    GitHub
+                                </a>
 
                                 <div className="mt-4 pt-6 border-t border-zinc-800">
                                     <div className="flex items-center gap-2 text-zinc-400">

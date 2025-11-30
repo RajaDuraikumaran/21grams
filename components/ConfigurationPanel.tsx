@@ -40,7 +40,7 @@ export function ConfigurationPanel({ onGenerate }: ConfigurationPanelProps) {
     } = useAppStore();
 
     const handleGenerateClick = () => {
-        const cost = 3;
+        const cost = 4;
         if (credits >= cost) {
             setCredits(credits - cost);
             toast.info("Sending to AI...");
@@ -208,7 +208,7 @@ export function ConfigurationPanel({ onGenerate }: ConfigurationPanelProps) {
                             </span>
                         </button>
                         <p className="mt-3 text-center text-[10px] font-medium text-zinc-500">
-                            Cost: 3 Credits • Estimated time: ~15s
+                            Cost: 4 Credits (Daily Balance) • Estimated time: ~15s
                         </p>
                     </div>
                 </div>

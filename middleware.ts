@@ -65,10 +65,10 @@ export async function middleware(request: NextRequest) {
         return response
     }
 
-    // 3. Handle Login Page
-    if (request.nextUrl.pathname === '/login') {
+    // 3. Handle Login Page and Root
+    if (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/') {
         if (user) {
-            return NextResponse.redirect(new URL('/dashboard', request.url))
+            return NextResponse.redirect(new URL('/create', request.url))
         }
         return response
     }
