@@ -1,14 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // 1. Force the build to pass even if there are Type errors
     typescript: {
+        // !! WARN !!
+        // Dangerously allow production builds to successfully complete even if
+        // your project has type errors.
         ignoreBuildErrors: true,
     },
-    // 2. Force the build to pass even if there are Linter errors
     eslint: {
+        // Warning: This allows production builds to successfully complete even if
+        // your project has ESLint errors.
         ignoreDuringBuilds: true,
     },
-    // 3. Allow images from any domain (crucial for User Avatars & AI results)
     images: {
         remotePatterns: [
             {
@@ -19,4 +21,4 @@ const nextConfig = {
     },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
