@@ -1,15 +1,35 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { UploadHero } from "@/components/UploadHero";
 import { ConfigurationPanel } from "@/components/ConfigurationPanel";
 import { LoadingView } from "@/components/LoadingView";
 import { ResultsGallery } from "@/components/ResultsGallery";
 import { useAppStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
-  const { step, setStep, setFile, setPreview, setSelectedStyles, setGeneratedImages } = useAppStore();
+  const { step, setStep, setFile, setPreview, setSelectedStyles, setGeneratedImages, setCredits } = useAppStore();
+
+  // Fetch user credits on mount
+  useEffect(() => {
+    const fetchCredits = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('credits')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          setCredits(profile.credits || 24); // Default to 24 if null
+        }
+      }
+    };
+    fetchCredits();
+  }, [setCredits]);
 
   const handleUpload = useCallback(() => setStep('configure'), [setStep]);
   const handleGenerate = useCallback(() => setStep('generating'), [setStep]);
