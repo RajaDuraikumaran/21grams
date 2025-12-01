@@ -25,10 +25,11 @@ export function UploadHero({ onNext }: UploadHeroProps) {
             setIsUploading(true);
 
             try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    throw new Error("User not authenticated");
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) {
+                    throw new Error("User not authenticated. Please log in again.");
                 }
+                const user = session.user;
                 console.log("Uploading as user:", user.id);
 
                 const fileExt = selectedFile.name.split('.').pop();

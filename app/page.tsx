@@ -12,23 +12,35 @@ import { supabase } from "@/lib/supabase";
 export default function Home() {
   const { step, setStep, setFile, setPreview, setSelectedStyles, setGeneratedImages, setCredits } = useAppStore();
 
-  // Fetch user credits on mount
+  // Fetch user credits on mount and auth state change
   useEffect(() => {
-    const fetchCredits = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('credits')
-          .eq('id', user.id)
-          .single();
+    const fetchCredits = async (userId: string) => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('credits')
+        .eq('id', userId)
+        .single();
 
-        if (profile) {
-          setCredits(profile.credits || 24); // Default to 24 if null
-        }
+      if (profile) {
+        setCredits(profile.credits || 24);
       }
     };
-    fetchCredits();
+
+    // Initial check
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) fetchCredits(user.id);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        fetchCredits(session.user.id);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [setCredits]);
 
   const handleUpload = useCallback(() => setStep('configure'), [setStep]);

@@ -109,15 +109,6 @@ export function Navbar() {
                         >
                             Dashboard
                         </Link>
-                        <a
-                            href="https://github.com/RajaDuraikumaran/21grams"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-medium text-zinc-400 transition-colors hover:text-white flex items-center gap-1.5"
-                        >
-                            <Github className="h-4 w-4" />
-                            GitHub
-                        </a>
                     </div>
 
                     {/* Right Side */}
@@ -237,16 +228,7 @@ export function Navbar() {
                                 >
                                     Dashboard
                                 </Link>
-                                <a
-                                    href="https://github.com/RajaDuraikumaran/21grams"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className="text-lg font-medium text-zinc-400 transition-colors hover:text-white flex items-center gap-2"
-                                >
-                                    <Github className="h-5 w-5" />
-                                    GitHub
-                                </a>
+
 
                                 <div className="mt-4 pt-6 border-t border-zinc-800">
                                     <div className="flex items-center gap-2 text-zinc-400">
