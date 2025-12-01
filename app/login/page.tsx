@@ -157,7 +157,7 @@ export default function LoginPage() {
                         <Link href="/" className="inline-block">
                             <span className="text-3xl font-black tracking-tighter text-white">21Grams.</span>
                         </Link>
-                        <h1 className="text-lg font-medium text-zinc-400">Private Access Only.</h1>
+                        <h1 className="text-lg font-medium text-zinc-400">Create Your AI Portrait.</h1>
                     </div>
 
                     {/* Actions */}
@@ -259,7 +259,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="text-center text-xs text-zinc-500">
-                        Restricted area. Authorized personnel only.
+                        Free forever. 24 credits daily.
                     </p>
                 </motion.div>
             </div>
