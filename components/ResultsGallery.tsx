@@ -14,9 +14,10 @@ interface ResultsGalleryProps {
     images?: string[];
     title?: string;
     onReset?: () => void;
+    showStepper?: boolean;
 }
 
-export function ResultsGallery({ images, title = "Your AI Selfies", onReset }: ResultsGalleryProps) {
+export function ResultsGallery({ images, title = "Your AI Selfies", onReset, showStepper = false }: ResultsGalleryProps) {
     const { generatedImages: storeImages } = useAppStore();
     const displayImages = images || storeImages;
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
@@ -67,10 +68,12 @@ export function ResultsGallery({ images, title = "Your AI Selfies", onReset }: R
 
     return (
         <div className="mx-auto flex min-h-[80vh] w-full max-w-6xl flex-col gap-8 px-4 pt-20">
-            {/* Step Indicator */}
-            <div className="flex justify-center mb-4">
-                <StepIndicator currentStep="results" />
-            </div>
+            {/* Step Indicator - Only show in Create workflow */}
+            {showStepper && (
+                <div className="flex justify-center mb-4">
+                    <StepIndicator currentStep="results" />
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex items-center justify-between">

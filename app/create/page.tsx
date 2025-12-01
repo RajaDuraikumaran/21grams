@@ -65,7 +65,7 @@ export default function Home() {
       ) : step === 'generating' ? (
         <LoadingView onComplete={handleGenerationComplete} onCancel={() => setStep('configure')} />
       ) : (
-        <ResultsGallery onReset={handleReset} />
+        <ResultsGallery onReset={handleReset} showStepper={true} />
       )}
 
       {/* Background Grid Pattern (Optional but adds to the premium feel) */}
