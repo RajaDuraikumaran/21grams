@@ -3,6 +3,7 @@ import { HfInference } from "@huggingface/inference";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { STYLES } from "@/lib/styles";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const apiKey = process.env.HUGGINGFACE_API_KEY;
 const hf = new HfInference(apiKey);
@@ -259,8 +260,8 @@ export async function POST(request: Request) {
             .from("user-uploads")
             .getPublicUrl(fileName);
 
-        // 8. Save to DB
-        const { error: dbError } = await supabase
+        // 8. Save to DB (Use Admin client to bypass RLS)
+        const { error: dbError } = await supabaseAdmin
             .from("generations")
             .insert([
                 {
