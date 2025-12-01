@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { HfInference } from "@huggingface/inference";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { STYLES } from "@/lib/styles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const segmindApiKey = process.env.SEGMIND_API_KEY;
+const apiKey = process.env.HUGGINGFACE_API_KEY;
+const hf = new HfInference(apiKey);
 
 // Map filter names to specific prompt additions
 const FILTER_PROMPTS: Record<string, string> = {
@@ -22,7 +24,7 @@ const FILTER_PROMPTS: Record<string, string> = {
 
 export async function POST(request: Request) {
     try {
-        console.log("API Request received (Segmind InstantID Generation)");
+        console.log("API Request received (HF Generation)");
         const body = await request.json();
         const { imageUrl, styleId, filters } = body;
 
@@ -30,13 +32,6 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: "Image URL and style ID are required" },
                 { status: 400 }
-            );
-        }
-
-        if (!segmindApiKey) {
-            return NextResponse.json(
-                { error: "Segmind API key not configured" },
-                { status: 500 }
             );
         }
 
@@ -155,10 +150,10 @@ export async function POST(request: Request) {
 
         console.log(`Credits deducted: ${currentCredits} -> ${newCredits} for user ${user.id}`);
 
-        // 6. Construct Prompt
         const selectedStyle = STYLES.find((s) => s.id === styleId);
         const stylePrompt = selectedStyle?.prompt || STYLES[0].prompt;
 
+        // 3. Construct Prompt
         const filterPrompts = filters
             ? (filters as string[])
                 .map((f) => FILTER_PROMPTS[f])
@@ -166,47 +161,92 @@ export async function POST(request: Request) {
                 .join(", ")
             : "";
 
-        const finalPrompt = `${stylePrompt}, ${filterPrompts}, highly detailed face, professional photography`;
-        const negativePrompt = "ugly, deformed, blurry, low quality, distorted face, bad anatomy";
+        // 4. Fetch Image Blob (Required for both captioning and generation)
+        const imageRes = await fetch(imageUrl);
+        const imageBlob = await imageRes.blob();
 
-        console.log("Calling Segmind InstantID API...");
-
-        // 7. Call Segmind InstantID API
-        const segmindResponse = await fetch("https://api.segmind.com/v1/instantid", {
-            method: "POST",
-            headers: {
-                "x-api-key": segmindApiKey,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                image: imageUrl,
-                tpose: imageUrl, // Use same image to preserve head pose
-                prompt: finalPrompt,
-                negative_prompt: negativePrompt,
-                style: "Identity", // Preserves the face
-                strength: 0.8,
-                guidance_scale: 5,
-                num_inference_steps: 30,
-            }),
-        });
-
-        if (!segmindResponse.ok) {
-            const errorText = await segmindResponse.text();
-            console.error("Segmind API error:", errorText);
-            throw new Error(`Segmind API failed: ${segmindResponse.status} - ${errorText}`);
+        // 5. Captioning (Optional but good for context)
+        let caption = "portrait of a person";
+        try {
+            const captionResult = await hf.imageToText({
+                model: "Salesforce/blip-image-captioning-large",
+                data: imageBlob,
+            });
+            if (captionResult && captionResult.generated_text) {
+                caption = captionResult.generated_text;
+            }
+        } catch (error) {
+            console.warn("Captioning failed, using default:", error);
         }
 
-        // 8. Convert response to buffer
-        const imageBuffer = await segmindResponse.arrayBuffer();
-        const buffer = Buffer.from(imageBuffer);
+        const finalPrompt = `(${caption}), ${stylePrompt}, ${filterPrompts}, high quality, detailed, 8k`;
+        const negativePrompt = "(lowres, low quality, worst quality:1.2), (text:1.2), watermark, (frame:1.2), deformed, ugly, deformed eyes, blur, out of focus, blurry, bad quality";
 
-        // 9. Upload to Supabase Storage
-        const fileName = `gen-${user.id}-${Date.now()}.jpg`;
+        // List of models to try in order
+        const MODELS = [
+            "runwayml/stable-diffusion-v1-5",
+            "stabilityai/stable-diffusion-2-1",
+            "prompthero/openjourney",
+            "CompVis/stable-diffusion-v1-4",
+            "stabilityai/stable-diffusion-xl-refiner-1.0"
+        ];
+
+        let generatedBlob: Blob | null = null;
+        let lastError: any = null;
+
+        console.log("Starting generation with fallback logic...");
+
+        // Try each model until one works
+        for (const model of MODELS) {
+            try {
+                console.log(`Attempting generation with model: ${model}`);
+                generatedBlob = await hf.imageToImage({
+                    model: model,
+                    inputs: imageBlob,
+                    parameters: {
+                        prompt: finalPrompt,
+                        negative_prompt: negativePrompt,
+                        strength: 0.75,
+                        guidance_scale: 7.5,
+                    }
+                });
+                console.log(`Γ£à Success with ${model}`);
+                break; // Stop if successful
+            } catch (error: any) {
+                console.warn(`Γ¥î Failed with ${model}: ${error.message}`);
+                lastError = error;
+                // Continue to next model
+            }
+        }
+
+        if (!generatedBlob) {
+            console.warn("All Img2Img models failed. Falling back to Text-to-Image...");
+            try {
+                // Fallback to Text-to-Image using the caption
+                generatedBlob = (await hf.textToImage({
+                    model: "stabilityai/stable-diffusion-xl-base-1.0",
+                    inputs: finalPrompt,
+                    parameters: {
+                        negative_prompt: negativePrompt,
+                        guidance_scale: 7.5,
+                    }
+                })) as unknown as Blob;
+                console.log("Γ£à Success with Text-to-Image Fallback");
+            } catch (fallbackError: any) {
+                throw new Error(`All generation attempts failed. Last error: ${fallbackError.message}`);
+            }
+        }
+
+        // 6. Upload to Supabase
+        const fileName = `gen-${user.id}-${Date.now()}.png`;
+        const arrayBuffer = await generatedBlob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
         const { data: uploadData, error: uploadError } = await supabase
             .storage
             .from("user-uploads")
             .upload(fileName, buffer, {
-                contentType: "image/jpeg",
+                contentType: "image/png",
                 upsert: false
             });
 
@@ -214,13 +254,13 @@ export async function POST(request: Request) {
             throw new Error(`Upload failed: ${uploadError.message}`);
         }
 
-        // 10. Get Public URL
+        // 7. Get Public URL
         const { data: { publicUrl } } = supabase
             .storage
             .from("user-uploads")
             .getPublicUrl(fileName);
 
-        // 11. Save to DB (Use Admin client to bypass RLS)
+        // 8. Save to DB (Use Admin client to bypass RLS)
         const { error: dbError } = await supabaseAdmin
             .from("generations")
             .insert([
@@ -235,7 +275,6 @@ export async function POST(request: Request) {
             console.error("DB Insert Error:", dbError);
         }
 
-        console.log("✅ Generation successful!");
         return NextResponse.json({ imageUrl: publicUrl });
 
     } catch (error: any) {
