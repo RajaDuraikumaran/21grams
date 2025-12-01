@@ -204,9 +204,9 @@ export async function POST(request: Request) {
                     model: model,
                     inputs: imageBlob,
                     parameters: {
-                        prompt: finalPrompt,
-                        negative_prompt: negativePrompt,
-                        strength: 0.75,
+                        prompt: `(preserve facial structure, preserve identity:1.2), ${finalPrompt}`,
+                        negative_prompt: `${negativePrompt}, gender change, changing face, different person`,
+                        strength: 0.5, // Lower strength to preserve original image structure
                         guidance_scale: 7.5,
                     }
                 });
