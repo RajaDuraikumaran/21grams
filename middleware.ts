@@ -73,8 +73,13 @@ export async function middleware(request: NextRequest) {
         return response
     }
 
-    // 4. Handle Protected Routes
-    const protectedRoutes = ['/dashboard', '/pricing', '/create']
+    // 4. Redirect Pricing to Create
+    if (request.nextUrl.pathname === '/pricing') {
+        return NextResponse.redirect(new URL('/create', request.url))
+    }
+
+    // 5. Handle Protected Routes
+    const protectedRoutes = ['/dashboard', '/create']
     const isProtectedRoute = protectedRoutes.some(route =>
         request.nextUrl.pathname.startsWith(route)
     ) || request.nextUrl.pathname === '/'
