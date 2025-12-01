@@ -165,22 +165,82 @@ export async function POST(request: Request) {
         const imageRes = await fetch(imageUrl);
         const imageBlob = await imageRes.blob();
 
-        // 5. Captioning (Optional but good for context)
+        // 5. Enhanced Image Analysis - Detect Gender, Age, and Features
         let caption = "portrait of a person";
+        let detectedGender = "";
+        let detectedAge = "";
+        let facialFeatures = "";
+
         try {
+            // Use a more detailed captioning model
             const captionResult = await hf.imageToText({
-                model: "Salesforce/blip-image-captioning-large",
+                model: "nlpconnect/vit-gpt2-image-captioning",
                 data: imageBlob,
             });
             if (captionResult && captionResult.generated_text) {
-                caption = captionResult.generated_text;
+                caption = captionResult.generated_text.toLowerCase();
+                console.log("Generated caption:", caption);
+
+                // Detect gender from caption
+                if (caption.includes("man") || caption.includes("male") || caption.includes("boy") || caption.includes("gentleman")) {
+                    detectedGender = "man, male";
+                } else if (caption.includes("woman") || caption.includes("female") || caption.includes("girl") || caption.includes("lady")) {
+                    detectedGender = "woman, female";
+                }
+
+                // Detect age indicators
+                if (caption.includes("young") || caption.includes("boy") || caption.includes("girl")) {
+                    detectedAge = "young";
+                } else if (caption.includes("old") || caption.includes("elderly") || caption.includes("senior")) {
+                    detectedAge = "mature";
+                }
+
+                // Extract facial features
+                const featureKeywords = ["beard", "mustache", "glasses", "bald", "curly hair", "straight hair", "short hair", "long hair"];
+                const foundFeatures = featureKeywords.filter(keyword => caption.includes(keyword));
+                if (foundFeatures.length > 0) {
+                    facialFeatures = foundFeatures.join(", ");
+                }
             }
         } catch (error) {
-            console.warn("Captioning failed, using default:", error);
+            console.warn("Advanced captioning failed, trying fallback:", error);
+            try {
+                // Fallback to BLIP
+                const fallbackResult = await hf.imageToText({
+                    model: "Salesforce/blip-image-captioning-large",
+                    data: imageBlob,
+                });
+                if (fallbackResult && fallbackResult.generated_text) {
+                    caption = fallbackResult.generated_text.toLowerCase();
+                    console.log("Fallback caption:", caption);
+
+                    // Same detection logic for fallback
+                    if (caption.includes("man") || caption.includes("male") || caption.includes("boy")) {
+                        detectedGender = "man, male";
+                    } else if (caption.includes("woman") || caption.includes("female") || caption.includes("girl")) {
+                        detectedGender = "woman, female";
+                    }
+                }
+            } catch (fallbackError) {
+                console.warn("All captioning failed, using defaults:", fallbackError);
+            }
         }
 
-        const finalPrompt = `(${caption}), ${stylePrompt}, ${filterPrompts}, high quality, detailed, 8k`;
-        const negativePrompt = "(lowres, low quality, worst quality:1.2), (text:1.2), watermark, (frame:1.2), deformed, ugly, deformed eyes, blur, out of focus, blurry, bad quality";
+        // Build identity preservation prompt
+        const identityPrompt = [
+            detectedGender,
+            detectedAge,
+            facialFeatures,
+            "same person",
+            "preserve facial structure",
+            "preserve identity",
+            "maintain original appearance"
+        ].filter(Boolean).join(", ");
+
+        console.log("Identity preservation prompt:", identityPrompt);
+
+        const finalPrompt = `${identityPrompt}, ${stylePrompt}, ${filterPrompts}, high quality, detailed, 8k, photorealistic`;
+        const negativePrompt = "(lowres, low quality, worst quality:1.2), (text:1.2), watermark, (frame:1.2), deformed, ugly, deformed eyes, blur, out of focus, blurry, bad quality, gender change, different person, wrong gender, face swap, different identity";
 
         // List of models to try in order
         const MODELS = [
@@ -204,10 +264,10 @@ export async function POST(request: Request) {
                     model: model,
                     inputs: imageBlob,
                     parameters: {
-                        prompt: `(preserve facial structure, preserve identity:1.2), ${finalPrompt}`,
-                        negative_prompt: `${negativePrompt}, gender change, changing face, different person`,
-                        strength: 0.5, // Lower strength to preserve original image structure
-                        guidance_scale: 7.5,
+                        prompt: finalPrompt,
+                        negative_prompt: negativePrompt,
+                        strength: 0.35, // Lower strength to preserve original features better
+                        guidance_scale: 8.0, // Slightly higher for better prompt adherence
                     }
                 });
                 console.log(`Γ£à Success with ${model}`);

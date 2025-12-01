@@ -4,7 +4,7 @@ export const STYLES = [
         label: "Studio Professional",
         src: "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=250&h=250&auto=format&fit=crop",
         prompt:
-            "wearing professional business attire, neutral studio background, soft lighting, 8k, ultra realistic, sharp focus",
+            "professional studio portrait, neutral background, soft professional lighting, clean aesthetic, 8k, ultra realistic, sharp focus",
         color: "#3b82f6", // Blue
     },
     {
@@ -12,7 +12,7 @@ export const STYLES = [
         label: "Classic B&W Film",
         src: "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?q=80&w=250&h=250&auto=format&fit=crop",
         prompt:
-            "classic black and white photography, film grain, dramatic shadows, serious emotion, leica style",
+            "classic black and white photography, film grain, dramatic shadows, leica style, timeless portrait",
         color: "#18181b", // Zinc 900
     },
     {
