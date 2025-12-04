@@ -42,13 +42,18 @@ export async function GET(request: Request) {
         const kieApiKey = process.env.KIE_API_KEY || process.env.NEXT_PUBLIC_KIE_API_KEY;
         const taskDetailsEndpoint = "https://api.nanobananaapi.ai/api/v1/nanobanana/get-task-details";
 
+        console.log(`[STATUS] Polling for taskId: ${taskId}`);
         const statusResponse = await fetch(`${taskDetailsEndpoint}?taskId=${taskId}`, {
             method: "GET",
             headers: { "Authorization": `Bearer ${kieApiKey}` },
         });
 
+        console.log(`[STATUS] NanoBanana Response: ${statusResponse.status}`);
+
         if (!statusResponse.ok) {
-            return NextResponse.json({ status: "failed", error: `API Error: ${statusResponse.status}` });
+            const errorText = await statusResponse.text();
+            console.error(`[STATUS] Polling failed (${statusResponse.status}):`, errorText);
+            return NextResponse.json({ status: "failed", error: `API Error: ${statusResponse.status} - ${errorText}` });
         }
 
         let statusData;
