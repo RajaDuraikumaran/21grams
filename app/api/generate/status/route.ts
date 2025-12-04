@@ -1,0 +1,130 @@
+import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+export const maxDuration = 10; // Fast response
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const taskId = searchParams.get("taskId");
+        const styleId = searchParams.get("styleId");
+
+        if (!taskId) {
+            return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+        }
+
+        // 1. Auth
+        const cookieStore = await cookies();
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() { return cookieStore.getAll(); },
+                    setAll(cookiesToSet) {
+                        try {
+                            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+                        } catch { }
+                    },
+                },
+            }
+        );
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // 2. Poll NanoBanana
+        const kieApiKey = process.env.KIE_API_KEY;
+        const taskDetailsEndpoint = "https://api.nanobananaapi.ai/api/v1/nanobanana/get-task-details";
+
+        const statusResponse = await fetch(`${taskDetailsEndpoint}?taskId=${taskId}`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${kieApiKey}` },
+        });
+
+        if (!statusResponse.ok) {
+            return NextResponse.json({ status: "failed", error: `API Error: ${statusResponse.status}` });
+        }
+
+        let statusData;
+        try {
+            statusData = await statusResponse.json();
+        } catch (e) {
+            console.error("Failed to parse status JSON", e);
+            return NextResponse.json({ status: "processing" }); // Assume processing if JSON fails temporarily
+        }
+
+        const successFlag = statusData.data?.successFlag; // 0: Generating, 1: Success, 2/3: Failed
+
+        if (successFlag === 0 || successFlag === undefined) {
+            return NextResponse.json({ status: "processing" });
+        }
+
+        if (successFlag === 2 || successFlag === 3) {
+            return NextResponse.json({
+                status: "failed",
+                error: statusData.data?.errorMessage || "Generation failed"
+            });
+        }
+
+        if (successFlag === 1) {
+            // Success
+            const resultUrl = statusData.data?.resultImageUrl ||
+                statusData.resultImageUrl ||
+                statusData.data?.result_image_url ||
+                statusData.result_image_url ||
+                statusData.data?.imageUrl ||
+                statusData.imageUrl;
+
+            if (!resultUrl) {
+                return NextResponse.json({ status: "failed", error: "Result URL missing" });
+            }
+
+            // Fetch Image
+            const imageResponse = await fetch(resultUrl);
+            if (!imageResponse.ok) {
+                return NextResponse.json({ status: "failed", error: "Failed to download image" });
+            }
+            const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+            // Upload to Supabase
+            const fileName = `gen-${user.id}-${Date.now()}.png`;
+            const { error: uploadError } = await supabase.storage
+                .from("user-uploads")
+                .upload(fileName, imageBuffer, { contentType: "image/png", upsert: false });
+
+            if (uploadError) {
+                return NextResponse.json({ status: "failed", error: `Upload failed: ${uploadError.message}` });
+            }
+
+            const { data: { publicUrl } } = supabase.storage
+                .from("user-uploads")
+                .getPublicUrl(fileName);
+
+            // Save to DB
+            if (styleId) {
+                const { error: dbError } = await supabaseAdmin
+                    .from("generations")
+                    .insert([{
+                        image_url: publicUrl,
+                        prompt_style: styleId,
+                        user_id: user.id,
+                    }]);
+                if (dbError) console.error("DB Insert Error", dbError);
+            }
+
+            return NextResponse.json({ status: "complete", imageUrl: publicUrl });
+        }
+
+        return NextResponse.json({ status: "processing" });
+
+    } catch (error: any) {
+        console.error("Status Check Error:", error);
+        return NextResponse.json({ status: "failed", error: error.message }, { status: 500 });
+    }
+}

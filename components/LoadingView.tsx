@@ -58,7 +58,8 @@ export function LoadingView({ onComplete, onCancel }: LoadingViewProps) {
                     if (signal.aborted) break;
 
                     try {
-                        const response = await fetch("/api/generate", {
+                        // 1. Submit Task
+                        const submitResponse = await fetch("/api/generate/submit", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
@@ -69,17 +70,41 @@ export function LoadingView({ onComplete, onCancel }: LoadingViewProps) {
                             signal,
                         });
 
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || "Generation failed");
+                        if (!submitResponse.ok) {
+                            const errorData = await submitResponse.json();
+                            throw new Error(errorData.error || "Submission failed");
                         }
 
-                        const data = await response.json();
-                        if (data.imageUrl) results.push(data.imageUrl);
+                        const { taskId } = await submitResponse.json();
+
+                        // 2. Poll for Status
+                        while (true) {
+                            if (signal.aborted) break;
+
+                            const statusResponse = await fetch(`/api/generate/status?taskId=${taskId}&styleId=${style}`, {
+                                signal
+                            });
+
+                            if (!statusResponse.ok) {
+                                throw new Error("Status check failed");
+                            }
+
+                            const statusData = await statusResponse.json();
+
+                            if (statusData.status === 'complete') {
+                                results.push(statusData.imageUrl);
+                                break;
+                            } else if (statusData.status === 'failed') {
+                                throw new Error(statusData.error || "Generation failed");
+                            }
+
+                            // Wait 2 seconds before next poll
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
 
                         if (selectedStyles.indexOf(style) < selectedStyles.length - 1) {
                             await new Promise((resolve) => {
-                                const timeout = setTimeout(resolve, 10000);
+                                const timeout = setTimeout(resolve, 2000); // Reduced delay between styles since we poll
                                 signal.addEventListener('abort', () => clearTimeout(timeout));
                             });
                         }
