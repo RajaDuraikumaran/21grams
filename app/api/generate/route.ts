@@ -1,12 +1,8 @@
 ﻿import { NextResponse } from "next/server";
-import { HfInference } from "@huggingface/inference";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { STYLES } from "@/lib/styles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-
-const apiKey = process.env.HUGGINGFACE_API_KEY;
-const hf = new HfInference(apiKey);
 
 // Map filter names to specific prompt additions
 const FILTER_PROMPTS: Record<string, string> = {
@@ -17,14 +13,14 @@ const FILTER_PROMPTS: Record<string, string> = {
     "Whiten Teeth": "bright white teeth, perfect smile",
     "Remove Marks": "flawless skin, no blemishes",
     "Gentle Smile": "gentle smile, friendly expression",
-    "Serious Expression": "serious emotion, closed mouth, intense stare",
+    "Serious Expression": " emotion, closed mouth, intense stare",
     "Looking Sideways": "looking away, side profile",
     "Direct Gaze": "looking directly at camera, eye contact",
 };
 
 export async function POST(request: Request) {
     try {
-        console.log("API Request received (HF Generation)");
+        console.log("API Request received (KIE AI Generation)");
         const body = await request.json();
         const { imageUrl, styleId, filters } = body;
 
@@ -129,7 +125,9 @@ export async function POST(request: Request) {
         }
 
         // 4. Check if user has enough credits
-        if (currentCredits < COST_PER_IMAGE) {
+        const isDev = process.env.NODE_ENV === 'development';
+
+        if (!isDev && currentCredits < COST_PER_IMAGE) {
             return NextResponse.json(
                 { error: "Daily limit reached. Come back tomorrow!" },
                 { status: 402 }
@@ -137,23 +135,27 @@ export async function POST(request: Request) {
         }
 
         // 5. Deduct credits
-        const newCredits = currentCredits - COST_PER_IMAGE;
-        const { error: deductError } = await supabase
-            .from('profiles')
-            .update({ credits: newCredits })
-            .eq('id', user.id);
+        if (!isDev) {
+            const newCredits = currentCredits - COST_PER_IMAGE;
+            const { error: deductError } = await supabase
+                .from('profiles')
+                .update({ credits: newCredits })
+                .eq('id', user.id);
 
-        if (deductError) {
-            console.error("Credit deduction error:", deductError);
-            return NextResponse.json({ error: "Failed to deduct credits" }, { status: 500 });
+            if (deductError) {
+                console.error("Credit deduction error:", deductError);
+                return NextResponse.json({ error: "Failed to deduct credits" }, { status: 500 });
+            }
+
+            console.log(`Credits deducted: ${currentCredits} -> ${newCredits} for user ${user.id}`);
+        } else {
+            console.log("Local Dev: Skipping credit deduction");
         }
 
-        console.log(`Credits deducted: ${currentCredits} -> ${newCredits} for user ${user.id}`);
-
+        // 6. Get style and build prompt
         const selectedStyle = STYLES.find((s) => s.id === styleId);
         const stylePrompt = selectedStyle?.prompt || STYLES[0].prompt;
 
-        // 3. Construct Prompt
         const filterPrompts = filters
             ? (filters as string[])
                 .map((f) => FILTER_PROMPTS[f])
@@ -161,151 +163,131 @@ export async function POST(request: Request) {
                 .join(", ")
             : "";
 
-        // 4. Fetch Image Blob (Required for both captioning and generation)
-        const imageRes = await fetch(imageUrl);
-        const imageBlob = await imageRes.blob();
+        // Enhanced prompt for img2img with identity preservation
+        const img2imgPrefix = "img2img, highly detailed portrait, exact facial features of input image";
+        const finalPrompt = `${img2imgPrefix}, ${stylePrompt}, ${filterPrompts}, photorealistic portrait`;
+        const negativePrompt = "cartoon, painting, illustration, (worst quality, low quality, normal quality:2)";
 
-        // 5. Enhanced Image Analysis - Detect Gender, Age, and Features
-        let caption = "portrait of a person";
-        let detectedGender = "";
-        let detectedAge = "";
-        let facialFeatures = "";
+        // 7. Call Nano Banana API (Task Submission)
+        const kieApiKey = process.env.KIE_API_KEY;
+        // Hardcode base URL to avoid configuration errors with double paths
+        const kieBaseUrl = "https://api.nanobananaapi.ai";
+        const generateEndpoint = `${kieBaseUrl}/api/v1/nanobanana/generate-pro`;
+        const taskDetailsEndpoint = `${kieBaseUrl}/api/v1/nanobanana/get-task-details`;
 
-        try {
-            // Use a more detailed captioning model
-            const captionResult = await hf.imageToText({
-                model: "nlpconnect/vit-gpt2-image-captioning",
-                data: imageBlob,
+        console.log("--- DEBUG START ---");
+        console.log("Using API Key:", kieApiKey ? `${kieApiKey.slice(0, 5)}...` : "MISSING");
+        console.log("Target URL:", generateEndpoint);
+        console.log("Image URL:", imageUrl);
+
+        if (!imageUrl) {
+            throw new Error("Image URL is missing from request body");
+        }
+
+        if (!kieApiKey) {
+            throw new Error("Nano Banana API key is not configured. Please set KIE_API_KEY in .env");
+        }
+
+        const payload = {
+            prompt: finalPrompt,
+            imageUrls: [imageUrl], // API expects array of strings
+            resolution: "2K",
+            aspectRatio: "1:1",
+            callBackUrl: "https://example.com/callback", // Dummy callback for localhost
+        };
+
+        console.log("Sending Payload:", JSON.stringify(payload, null, 2));
+
+        // Submit generation task
+        console.log("Submitting task to Nano Banana API...");
+        const submissionResponse = await fetch(generateEndpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${kieApiKey}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        console.log("Submission Response Status:", submissionResponse.status);
+
+        if (!submissionResponse.ok) {
+            const errorText = await submissionResponse.text();
+            console.error("Submission Error Body:", errorText);
+            throw new Error(`Task submission failed (${submissionResponse.status}): ${errorText}`);
+        }
+
+        const submissionData = await submissionResponse.json();
+        console.log("Submission Data:", JSON.stringify(submissionData, null, 2));
+
+        const taskId = submissionData.data?.taskId;
+
+        if (!taskId) {
+            throw new Error("Failed to get taskId from submission response");
+        }
+
+        console.log(`Task submitted successfully. Task ID: ${taskId}`);
+
+        // 8. Handle response
+        // 8. Poll for results
+        let generatedImageBuffer: Buffer | null = null;
+        const maxAttempts = 30; // 60 seconds timeout
+        const pollInterval = 2000; // 2 seconds
+
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+            console.log(`Polling task status (Attempt ${i + 1}/${maxAttempts})...`);
+            const statusResponse = await fetch(`${taskDetailsEndpoint}?taskId=${taskId}`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${kieApiKey}`,
+                },
             });
-            if (captionResult && captionResult.generated_text) {
-                caption = captionResult.generated_text.toLowerCase();
-                console.log("Generated caption:", caption);
 
-                // Detect gender from caption
-                if (caption.includes("man") || caption.includes("male") || caption.includes("boy") || caption.includes("gentleman")) {
-                    detectedGender = "man, male";
-                } else if (caption.includes("woman") || caption.includes("female") || caption.includes("girl") || caption.includes("lady")) {
-                    detectedGender = "woman, female";
-                }
-
-                // Detect age indicators
-                if (caption.includes("young") || caption.includes("boy") || caption.includes("girl")) {
-                    detectedAge = "young";
-                } else if (caption.includes("old") || caption.includes("elderly") || caption.includes("senior")) {
-                    detectedAge = "mature";
-                }
-
-                // Extract facial features
-                const featureKeywords = ["beard", "mustache", "glasses", "bald", "curly hair", "straight hair", "short hair", "long hair"];
-                const foundFeatures = featureKeywords.filter(keyword => caption.includes(keyword));
-                if (foundFeatures.length > 0) {
-                    facialFeatures = foundFeatures.join(", ");
-                }
+            if (!statusResponse.ok) {
+                console.warn(`Poll request failed: ${statusResponse.status}`);
+                continue;
             }
-        } catch (error) {
-            console.warn("Advanced captioning failed, trying fallback:", error);
-            try {
-                // Fallback to BLIP
-                const fallbackResult = await hf.imageToText({
-                    model: "Salesforce/blip-image-captioning-large",
-                    data: imageBlob,
-                });
-                if (fallbackResult && fallbackResult.generated_text) {
-                    caption = fallbackResult.generated_text.toLowerCase();
-                    console.log("Fallback caption:", caption);
 
-                    // Same detection logic for fallback
-                    if (caption.includes("man") || caption.includes("male") || caption.includes("boy")) {
-                        detectedGender = "man, male";
-                    } else if (caption.includes("woman") || caption.includes("female") || caption.includes("girl")) {
-                        detectedGender = "woman, female";
-                    }
+            const statusData = await statusResponse.json();
+            const successFlag = statusData.data?.successFlag; // 0: Generating, 1: Success, 2/3: Failed
+
+            if (successFlag === 1) {
+                // Success!
+                const resultUrl = statusData.data?.resultImageUrl;
+                if (!resultUrl) {
+                    throw new Error("Task succeeded but resultImageUrl is missing");
                 }
-            } catch (fallbackError) {
-                console.warn("All captioning failed, using defaults:", fallbackError);
+
+                console.log("Generation successful! Fetching result image...");
+                const imageResponse = await fetch(resultUrl);
+                if (!imageResponse.ok) {
+                    throw new Error(`Failed to fetch result image: ${imageResponse.status}`);
+                }
+                generatedImageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+                break;
+
+            } else if (successFlag === 2 || successFlag === 3) {
+                // Failed
+                throw new Error(`Generation failed. Error code: ${statusData.data?.errorCode}, Message: ${statusData.data?.errorMessage}`);
             }
+            // If 0, continue polling
         }
 
-        // Build identity preservation prompt
-        const identityPrompt = [
-            detectedGender,
-            detectedAge,
-            facialFeatures,
-            "same person",
-            "preserve facial structure",
-            "preserve identity",
-            "maintain original appearance"
-        ].filter(Boolean).join(", ");
-
-        console.log("Identity preservation prompt:", identityPrompt);
-
-        const finalPrompt = `${identityPrompt}, ${stylePrompt}, ${filterPrompts}, high quality, detailed, 8k, photorealistic`;
-        const negativePrompt = "(lowres, low quality, worst quality:1.2), (text:1.2), watermark, (frame:1.2), deformed, ugly, deformed eyes, blur, out of focus, blurry, bad quality, gender change, different person, wrong gender, face swap, different identity";
-
-        // List of models to try in order
-        const MODELS = [
-            "runwayml/stable-diffusion-v1-5",
-            "stabilityai/stable-diffusion-2-1",
-            "prompthero/openjourney",
-            "CompVis/stable-diffusion-v1-4",
-            "stabilityai/stable-diffusion-xl-refiner-1.0"
-        ];
-
-        let generatedBlob: Blob | null = null;
-        let lastError: any = null;
-
-        console.log("Starting generation with fallback logic...");
-
-        // Try each model until one works
-        for (const model of MODELS) {
-            try {
-                console.log(`Attempting generation with model: ${model}`);
-                generatedBlob = await hf.imageToImage({
-                    model: model,
-                    inputs: imageBlob,
-                    parameters: {
-                        prompt: finalPrompt,
-                        negative_prompt: negativePrompt,
-                        strength: 0.35, // Lower strength to preserve original features better
-                        guidance_scale: 8.0, // Slightly higher for better prompt adherence
-                    }
-                });
-                console.log(`Γ£à Success with ${model}`);
-                break; // Stop if successful
-            } catch (error: any) {
-                console.warn(`Γ¥î Failed with ${model}: ${error.message}`);
-                lastError = error;
-                // Continue to next model
-            }
+        if (!generatedImageBuffer) {
+            throw new Error("Generation timed out after 60 seconds");
         }
 
-        if (!generatedBlob) {
-            console.warn("All Img2Img models failed. Falling back to Text-to-Image...");
-            try {
-                // Fallback to Text-to-Image using the caption
-                generatedBlob = (await hf.textToImage({
-                    model: "stabilityai/stable-diffusion-xl-base-1.0",
-                    inputs: finalPrompt,
-                    parameters: {
-                        negative_prompt: negativePrompt,
-                        guidance_scale: 7.5,
-                    }
-                })) as unknown as Blob;
-                console.log("Γ£à Success with Text-to-Image Fallback");
-            } catch (fallbackError: any) {
-                throw new Error(`All generation attempts failed. Last error: ${fallbackError.message}`);
-            }
-        }
+        console.log("Image buffer ready, size:", generatedImageBuffer.length, "bytes");
 
-        // 6. Upload to Supabase
+        // 9. Upload to Supabase
         const fileName = `gen-${user.id}-${Date.now()}.png`;
-        const arrayBuffer = await generatedBlob.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
 
         const { data: uploadData, error: uploadError } = await supabase
             .storage
             .from("user-uploads")
-            .upload(fileName, buffer, {
+            .upload(fileName, generatedImageBuffer, {
                 contentType: "image/png",
                 upsert: false
             });
@@ -314,13 +296,13 @@ export async function POST(request: Request) {
             throw new Error(`Upload failed: ${uploadError.message}`);
         }
 
-        // 7. Get Public URL
+        // 10. Get Public URL
         const { data: { publicUrl } } = supabase
             .storage
             .from("user-uploads")
             .getPublicUrl(fileName);
 
-        // 8. Save to DB (Use Admin client to bypass RLS)
+        // 11. Save to DB (Use Admin client to bypass RLS)
         const { error: dbError } = await supabaseAdmin
             .from("generations")
             .insert([
