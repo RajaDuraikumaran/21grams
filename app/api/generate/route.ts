@@ -220,10 +220,15 @@ export async function POST(request: Request) {
         const submissionData = await submissionResponse.json();
         console.log("Submission Data:", JSON.stringify(submissionData, null, 2));
 
-        const taskId = submissionData.data?.taskId;
+        // Try multiple possible locations for taskId in the response
+        const taskId = submissionData.data?.taskId ||
+            submissionData.taskId ||
+            submissionData.data?.task_id ||
+            submissionData.task_id;
 
         if (!taskId) {
-            throw new Error("Failed to get taskId from submission response");
+            console.error("Full submission response:", submissionData);
+            throw new Error(`Failed to get taskId from submission response. Response structure: ${JSON.stringify(submissionData)}`);
         }
 
         console.log(`Task submitted successfully. Task ID: ${taskId}`);
