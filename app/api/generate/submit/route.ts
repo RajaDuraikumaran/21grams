@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         }
 
         // 1. Setup Supabase Client (User Context)
-        const cookie Store = await cookies();
+        const cookieStore = await cookies();
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
