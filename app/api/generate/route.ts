@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 import { STYLES } from "@/lib/styles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+// Configure route to allow longer execution time (5 minutes for image generation)
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+
 // Map filter names to specific prompt additions
 const FILTER_PROMPTS: Record<string, string> = {
     "Smooth Skin": "smooth skin texture, beauty retouch",
@@ -255,7 +259,14 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            const statusData = await statusResponse.json();
+            let statusData;
+            try {
+                statusData = await statusResponse.json();
+            } catch (e) {
+                console.error("Failed to parse polling response as JSON:", e);
+                continue;
+            }
+
             const successFlag = statusData.data?.successFlag; // 0: Generating, 1: Success, 2/3: Failed
 
             if (successFlag === 1) {
