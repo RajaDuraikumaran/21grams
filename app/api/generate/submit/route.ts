@@ -199,8 +199,8 @@ export async function POST(request: Request) {
             submissionData.task_id;
 
         if (!taskId) {
-            console.error("[SUBMIT] No taskId in response:", submissionData);
-            throw new Error("Failed to get taskId from NanoBanana");
+            console.error("[SUBMIT] No taskId in response:", JSON.stringify(submissionData, null, 2));
+            throw new Error(`Failed to get taskId from NanoBanana. Response: ${JSON.stringify(submissionData)}`);
         }
 
         console.log(`[SUBMIT] Task submitted successfully. taskId: ${taskId}`);
