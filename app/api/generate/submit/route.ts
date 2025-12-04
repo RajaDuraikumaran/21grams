@@ -161,11 +161,11 @@ export async function POST(request: Request) {
         const finalPrompt = `${img2imgPrefix}, ${stylePrompt}, ${filterPrompts}, photorealistic portrait`;
 
         // 7. Submit to NanoBanana API
-        const kieApiKey = process.env.KIE_API_KEY;
+        const kieApiKey = process.env.KIE_API_KEY || process.env.NEXT_PUBLIC_KIE_API_KEY;
         const generateEndpoint = "https://api.nanobananaapi.ai/api/v1/nanobanana/generate-pro";
 
         if (!kieApiKey) {
-            throw new Error("NanoBanana API key not configured");
+            throw new Error("NanoBanana API key not configured. Set KIE_API_KEY or NEXT_PUBLIC_KIE_API_KEY");
         }
 
         const payload = {
