@@ -228,16 +228,16 @@ export async function POST(request: Request) {
 
         console.log(`Task submitted successfully. Task ID: ${taskId}`);
 
-        // 8. Handle response
         // 8. Poll for results
         let generatedImageBuffer: Buffer | null = null;
-        const maxAttempts = 30; // 60 seconds timeout
+        // In dev: poll indefinitely, In prod: 5 minute timeout
+        const maxAttempts = isDev ? Infinity : 150; // 150 attempts = 5 minutes in production
         const pollInterval = 2000; // 2 seconds
 
         for (let i = 0; i < maxAttempts; i++) {
             await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-            console.log(`Polling task status (Attempt ${i + 1}/${maxAttempts})...`);
+            console.log(`Polling task status (Attempt ${i + 1}${isDev ? '' : `/${maxAttempts}`})...`);
             const statusResponse = await fetch(`${taskDetailsEndpoint}?taskId=${taskId}`, {
                 method: "GET",
                 headers: {
@@ -276,7 +276,9 @@ export async function POST(request: Request) {
         }
 
         if (!generatedImageBuffer) {
-            throw new Error("Generation timed out after 60 seconds");
+            throw new Error(isDev
+                ? "Generation failed - check NanoBanana API status"
+                : "Generation timed out after 5 minutes");
         }
 
         console.log("Image buffer ready, size:", generatedImageBuffer.length, "bytes");
