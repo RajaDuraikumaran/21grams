@@ -193,6 +193,15 @@ export async function POST(request: Request) {
         }
 
         const submissionData = await submissionResponse.json();
+
+        if (submissionData.code === 402) {
+            console.error("[SUBMIT] NanoBanana Insufficient Credits:", submissionData.msg);
+            return NextResponse.json(
+                { error: "NanoBanana API: Insufficient Credits. Please top up your account." },
+                { status: 402 }
+            );
+        }
+
         const taskId = submissionData.data?.taskId ||
             submissionData.taskId ||
             submissionData.data?.task_id ||
