@@ -85,7 +85,10 @@ export async function GET(request: Request) {
             let resultUrl = null;
 
             // Defensive Parsing Strategy: Try all known patterns
-            if (statusData.data?.resultImageUrl) resultUrl = statusData.data.resultImageUrl;
+            // Primary pattern from official docs
+            if (statusData.data?.response?.resultImageUrl) resultUrl = statusData.data.response.resultImageUrl;
+            // Alternative patterns
+            else if (statusData.data?.resultImageUrl) resultUrl = statusData.data.resultImageUrl;
             else if (statusData.resultImageUrl) resultUrl = statusData.resultImageUrl;
             else if (statusData.data?.result_image_url) resultUrl = statusData.data.result_image_url;
             else if (statusData.result_image_url) resultUrl = statusData.result_image_url;
