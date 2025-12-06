@@ -157,8 +157,10 @@ export async function POST(request: Request) {
                 .join(", ")
             : "";
 
-        const img2imgPrefix = "img2img, highly detailed portrait, exact facial features of input image";
-        const finalPrompt = `${img2imgPrefix}, ${stylePrompt}, ${filterPrompts}, photorealistic portrait`;
+        // Improved prompt concatenation for aggressive style adherence
+        const facialFidelity = "featuring the face of the person in the input image, high fidelity, 8k";
+        const filterSuffix = filterPrompts ? `, ${filterPrompts}` : "";
+        const finalPrompt = `${stylePrompt}, ${facialFidelity}${filterSuffix}`;
 
         // 7. Submit to NanoBanana API
         const kieApiKey = process.env.KIE_API_KEY || process.env.NEXT_PUBLIC_KIE_API_KEY;
@@ -168,11 +170,17 @@ export async function POST(request: Request) {
             throw new Error("NanoBanana API key not configured. Set KIE_API_KEY or NEXT_PUBLIC_KIE_API_KEY");
         }
 
+        // Universal negative prompt to prevent quality degradation
+        const negativePrompt = "blurry, low quality, cartoon, illustration, drawing, deformed, ugly, distorted eyes, bad anatomy, pixelated, low res";
+
         const payload = {
             prompt: finalPrompt,
+            negativePrompt: negativePrompt,
             imageUrls: [imageUrl],
             resolution: "2K",
             aspectRatio: "1:1",
+            guidanceScale: 7.5,  // Force strict adherence to prompt
+            strength: 0.75,      // Optimal balance between original and style
             callBackUrl: "https://example.com/callback",
         };
 
