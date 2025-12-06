@@ -69,7 +69,7 @@ async function verify() {
 
         // 2. Check Status
         console.log("\n2. Checking Status...");
-        const statusUrl = `${BASE_URL}/api/v1/nanobanana/get-task-details?taskId=${taskId}`;
+        const statusUrl = `${BASE_URL}/api/v1/nanobanana/record-info?taskId=${taskId}`;
         console.log(`Status URL: ${statusUrl}`);
 
         const statusRes = await fetch(statusUrl, {

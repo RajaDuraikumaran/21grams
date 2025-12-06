@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
         // 2. Poll NanoBanana
         const kieApiKey = process.env.KIE_API_KEY || process.env.NEXT_PUBLIC_KIE_API_KEY;
-        const taskDetailsEndpoint = "https://api.nanobananaapi.ai/api/v1/nanobanana/get-task-details";
+        const taskDetailsEndpoint = "https://api.nanobananaapi.ai/api/v1/nanobanana/record-info";
 
         console.log(`[STATUS] Polling for taskId: ${taskId}`);
         const statusResponse = await fetch(`${taskDetailsEndpoint}?taskId=${taskId}`, {
