@@ -193,6 +193,7 @@ export async function POST(request: Request) {
         }
 
         const submissionData = await submissionResponse.json();
+        console.log("DEBUG: Full Submit API Response:", JSON.stringify(submissionData, null, 2));
 
         if (submissionData.code === 402) {
             console.error("[SUBMIT] NanoBanana Insufficient Credits:", submissionData.msg);
@@ -208,7 +209,7 @@ export async function POST(request: Request) {
             submissionData.task_id;
 
         if (!taskId) {
-            console.error("[SUBMIT] No taskId in response:", JSON.stringify(submissionData, null, 2));
+            console.error("[SUBMIT] No taskId in response. Keys found:", Object.keys(submissionData));
             throw new Error(`Failed to get taskId from NanoBanana. Response: ${JSON.stringify(submissionData)}`);
         }
 

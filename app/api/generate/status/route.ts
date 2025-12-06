@@ -79,16 +79,29 @@ export async function GET(request: Request) {
 
         if (successFlag === 1) {
             // Success
-            const resultUrl = statusData.data?.resultImageUrl ||
-                statusData.resultImageUrl ||
-                statusData.data?.result_image_url ||
-                statusData.result_image_url ||
-                statusData.data?.imageUrl ||
-                statusData.imageUrl;
+            // Success
+            console.log("DEBUG: Full Status API Response:", JSON.stringify(statusData, null, 2));
+
+            let resultUrl = null;
+
+            // Defensive Parsing Strategy: Try all known patterns
+            if (statusData.data?.resultImageUrl) resultUrl = statusData.data.resultImageUrl;
+            else if (statusData.resultImageUrl) resultUrl = statusData.resultImageUrl;
+            else if (statusData.data?.result_image_url) resultUrl = statusData.data.result_image_url;
+            else if (statusData.result_image_url) resultUrl = statusData.result_image_url;
+            else if (statusData.data?.imageUrl) resultUrl = statusData.data.imageUrl;
+            else if (statusData.imageUrl) resultUrl = statusData.imageUrl;
+            // Fallback: Check for 'output' or 'images' array often used in other AI APIs
+            else if (statusData.data?.output?.[0]) resultUrl = statusData.data.output[0];
+            else if (statusData.output?.[0]) resultUrl = statusData.output[0];
 
             if (!resultUrl) {
-                return NextResponse.json({ status: "failed", error: "Result URL missing" });
+                console.error("CRITICAL: Task succeeded but no image URL found in known paths.");
+                console.error("Available keys in data:", statusData.data ? Object.keys(statusData.data) : "No data object");
+                return NextResponse.json({ status: "failed", error: "Result URL missing from API response" });
             }
+
+            console.log(`[STATUS] Found Result URL: ${resultUrl}`);
 
             // Fetch Image
             const imageResponse = await fetch(resultUrl);
